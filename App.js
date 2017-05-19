@@ -35,7 +35,8 @@ Ext.define('CustomApp', {
 					'UserBusinessValue',
 					'WSJFScore',
 					'Name',
-					'Predecessors'],
+					'Predecessors',
+					'DragAndDropRank'],
 				filters: [
 					{
 						property: 'Release.Name',
@@ -61,6 +62,7 @@ Ext.define('CustomApp', {
 							feature.ref = record.raw._ref; //Get Ref;
 							feature.id = record.raw.ObjectID;
 							feature.name = record.raw.Name;
+							feature.rank = record.raw.DragAndDropRank;
 							feature.jobSize = record.raw.JobSize;
 							feature.rroeValue = record.raw.RROEValue;
 							feature.timeCriticality = record.raw.TimeCriticality;
@@ -127,7 +129,16 @@ Ext.define('CustomApp', {
 			callback: function( records, operation ) {
 				if( operation.wasSuccessful() ) {
 					_.each(records, function( record ){
-						feature.predecessors.push( record.raw.ObjectID );
+						var predecessorFeature = null;
+						_.each( features, function(possibleFeature ) {
+							if ( possibleFeature.id == record.raw.ObjectID ) {
+								predecessorFeature = possibleFeature;
+							}
+						}, this);
+						
+						if( predecessorFeature ) {
+							feature.predecessors.push( predecessorFeature );
+						}
 					},this);
 				}
 				this.checkPredecessors( features );
@@ -141,9 +152,7 @@ Ext.define('CustomApp', {
 			this.calculateWSJFScore( feature, features );
 		},this);						
 		
-		console.log( "Sorting Features by WSJF Score" );
-		_.sortBy( features, "wsjfScore" );
-		console.log( features );
+		this.compileData( features );
 	},
 	
 	calculateWSJFScore: function( feature, features ) {
@@ -151,14 +160,7 @@ Ext.define('CustomApp', {
 			var totalValue = feature.rroeValue + feature.timeCriticality + feature.userBusinessValue;
 			var totalJobSize = feature.jobSize;
 			
-			_.each( feature.predecessors, function( predecessorID ) {
-				var predecessor = null;
-				_.each( features, function( predecessorFeature ) {
-					if( predecessorFeature.id == predecessorID ) {
-						predecessor = predecessorFeature;
-					}
-				}, this);
-						
+			_.each( feature.predecessors, function( predecessor ) {
 				this.calculateWSJFScore( predecessor, features );
 				totalValue += predecessor.rroeValue + predecessor.timeCriticality + predecessor.userBusinessValue;
 				totalJobSize += predecessor.jobSize;
@@ -168,7 +170,49 @@ Ext.define('CustomApp', {
 		}
 	},
 	
-	compileData: function(){
+	compileData: function( features ){
+		var scoredFeatures = features;
+		var rankedFeatures = features.slice();
+		
+		scoredFeatures = this.sortFeatures( scoredFeatures, 'wsjfScore' );
+		rankedFeatures = this.sortFeatures( rankedFeatures, 'rank' );
+		
+		console.log( scoredFeatures );
+		console.log( rankedFeatures );
+	},
+	
+	sortFeatures: function( features, attribute, sortedFeatures ) {
+		console.log( "Sorting " + features.length + " features by " + attribute );
+		sortedFeatures = sortedFeatures || [];
+		// Sort our list of features by the attribute
+		features.sort( function(a, b) { return a[attribute] < b[attribute]; } );
+		
+		// See if each feature is already in our sortedFeatures array
+		_.each( features, function( feature ) {
+			var foundFeature = false;
+			_.each( sortedFeatures, function( sortedFeature ) {
+				if( sortedFeature.id == feature.id ) {
+					foundFeature = true;
+				}
+			}, this);
+			
+			// If this is a new Feature for our SortedFeatures, first insert any predecessors we haven't added yet
+			if( !foundFeature ) {
+				if( feature.predecessors.length > 0 ) {
+					this.sortFeatures( feature.predecessors, attribute, sortedFeatures );
+				}
+				console.log( "Adding " + feature.name );
+				sortedFeatures.push( feature );
+				console.log( sortedFeatures );
+			}
+		}, this);
+		
+		return sortedFeatures;
+	},
+		
+	/*		
+		var optimalLine = createValueCurve( features );
+	
 		var chartArray = [];
 		// Initialize array
 		for ( x = 0; x < this.CAIntents.length; x++ ) {
@@ -282,7 +326,7 @@ Ext.define('CustomApp', {
 		});
 		
 		this._myMask.hide();
-	},
+	}, */
 	
 	showNoDataBox:function(){
 		this._myMask.hide();
