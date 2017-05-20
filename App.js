@@ -67,6 +67,7 @@ Ext.define('CustomApp', {
 							feature.rroeValue = record.raw.RROEValue;
 							feature.timeCriticality = record.raw.TimeCriticality;
 							feature.userBusinessValue = record.raw.UserBusinessValue;
+							feature.value = feature.rroeValue + feature.timeCriticality + feature.userBusinessValue;
 							feature.wsjfScore = record.raw.WSJFScore;
 							feature.predecessorsCount = record.raw.Predecessors.Count;
 							feature.predecessors = [];
@@ -157,12 +158,12 @@ Ext.define('CustomApp', {
 	
 	calculateWSJFScore: function( feature, features ) {
 		if( feature.wsjfScore === 0 ) {
-			var totalValue = feature.rroeValue + feature.timeCriticality + feature.userBusinessValue;
+			var totalValue = feature.value;
 			var totalJobSize = feature.jobSize;
 			
 			_.each( feature.predecessors, function( predecessor ) {
 				this.calculateWSJFScore( predecessor, features );
-				totalValue += predecessor.rroeValue + predecessor.timeCriticality + predecessor.userBusinessValue;
+				totalValue += predecessor.value;
 				totalJobSize += predecessor.jobSize;
 			}, this);
 			
@@ -177,12 +178,14 @@ Ext.define('CustomApp', {
 		scoredFeatures = this.sortFeatures( scoredFeatures, 'wsjfScore' );
 		rankedFeatures = this.sortFeatures( rankedFeatures, 'rank' );
 		
-		console.log( scoredFeatures );
-		console.log( rankedFeatures );
+		var series = [];
+		series.push( this.createSeriesCurve( 'WSJF Ideal', scoredFeatures ) );
+		series.push( this.createSeriesCurve( 'Current Rank', rankedFeatures ) );
+		
+		this.makeChart( series );
 	},
 	
 	sortFeatures: function( features, attribute, sortedFeatures ) {
-		console.log( "Sorting " + features.length + " features by " + attribute );
 		sortedFeatures = sortedFeatures || [];
 		// Sort our list of features by the attribute
 		features.sort( function(a, b) { return a[attribute] < b[attribute]; } );
@@ -201,120 +204,82 @@ Ext.define('CustomApp', {
 				if( feature.predecessors.length > 0 ) {
 					this.sortFeatures( feature.predecessors, attribute, sortedFeatures );
 				}
-				console.log( "Adding " + feature.name );
 				sortedFeatures.push( feature );
-				console.log( sortedFeatures );
 			}
 		}, this);
 		
 		return sortedFeatures;
 	},
-		
-	/*		
-		var optimalLine = createValueCurve( features );
 	
-		var chartArray = [];
-		// Initialize array
-		for ( x = 0; x < this.CAIntents.length; x++ ) {
-			chartArray.push( [] );
-			for ( y = 0; y < this.customerPerceivedValues.length; y++ ) {
-				chartArray[ x ].push( [] );
-			}
-		}
+	createSeriesCurve: function( name, features ) {
+		var series = {};
+		series.name = name;
+		series.data = [];
 		
-		// Put Initiatives into the array
-		_.each( this.initiatives, function( initiative ) {
-			if( initiative.CAIntent && initiative.customerPerceivedValue ) {
-				chartArray[ this.CAIntents.indexOf( initiative.CAIntent ) ][ this.customerPerceivedValues.indexOf( initiative.customerPerceivedValue ) ].push( initiative );
+		var jobSizeIncrementer = 0;
+		var featureIndex = 0;
+		var sizeInFeature = 0;
+		var totalValue = 0;
+		while( featureIndex < features.length ) {
+			var feature = features[ featureIndex ];
+			if( sizeInFeature > feature.jobSize ) {
+				featureIndex++;
+				sizeInFeature = sizeInFeature - feature.jobSize;
+				totalValue += feature.value;
 			}
-		}, this );
-		
-		// Convert the array into series
-		var seriesData = [];
-		for ( x = 0; x < this.CAIntents.length; x++ ) {
-			for ( y = 0; y < this.customerPerceivedValues.length; y++ ) {
-				var cell = chartArray[ x ][ y ];
-				if ( cell.length > 0 ) {
-					cell.sort( function( a, b ) { return a.estimate < b.estimate; } );
-					
-					var series = {};
-					var cellEstimate = cell.reduce( function( total, a ) { return total + a.estimate; }, 0 );
-					
-					series.marker = { 
-						fillColor: cell[ 0 ].displayColor,
-						lineColor: '#000000'
-					};
-					series.data = [ {
-						x: x,
-						y: y,
-						z: ( cellEstimate / this.totalPoints ) * 100,
-						name: cell.reduce( function( string, a ) { return string + a.formattedId + '<br/>'; }, "" ),
-						tooltip: cell.reduce( function( string, a ) { return string + '<b>' + a.formattedId + ': </b>' + a.name + ' = ' + ( Math.round( ( a.estimate / cellEstimate ) * 100 ) ) + '%<br/>'; }, "" ),
-						color: cell[ 0 ].displayColor
-					} ];
-					seriesData.push( series );
-				}
-			}
+			series.data.push( totalValue );
+			sizeInFeature++;
 		}
-		this.makeChart( seriesData );
+		return series;
 	},
-	
+		
 	makeChart: function( seriesData ){
-		var CAIntentsCategories = this.CAIntents;
-		var customerPerceivedValuesCategories = this.customerPerceivedValues;
 	
 		var chart = this.add({
 				xtype: 'rallychart',
 				chartConfig: {
 					chart:{
-						type: 'bubble',
-						zoomType: 'xy'
+						type: 'area'
 					},
 					legend: {
-						enabled: false
+						enabled: true
 					},
 					xAxis: {
 						title: {
-							text: 'CA Intent'
+							text: 'Job Size'
 						},
 						labels: {
 							formatter: function () {
-								return CAIntentsCategories[ this.value ];
+								return this.value;
 							}
 						},
 						tickInterval: 1,
-						min: 0,
-						max: CAIntentsCategories.length - 1
+						min: 0
 					},
 					yAxis: {
 						title: {
-							text: 'Customer Perceived Value'
+							text: 'Value'
 						},
 						labels: {
 							formatter: function () {
-								return customerPerceivedValuesCategories[ this.value ];
+								return this.value;
 							}
 						},
 						tickInterval: 1,
-						min: 0,
-						max: customerPerceivedValuesCategories.length - 1
+						min: 0
 					},
 					title:{
-						text: 'Initiatives by CA Intents and Customer Perceived Value'
+						text: 'Projected Value over Time'
 					},
-					tooltip: {
-						useHTML: true,
-						pointFormat: '{point.tooltip}',
-						headerFormat: ''
-					},
+//					tooltip: {
+//						useHTML: true,
+//						pointFormat: '{point.tooltip}',
+//						headerFormat: ''
+//					},
 					plotOptions: {
 						series: {
 							dataLabels: {
-								enabled: true,
-								useHTML: true,
-								format: '{point.name}',
-								color: '#ffffff',
-								shadow: false
+								enabled: false
 							}
 						}
 					}
@@ -326,7 +291,7 @@ Ext.define('CustomApp', {
 		});
 		
 		this._myMask.hide();
-	}, */
+	},
 	
 	showNoDataBox:function(){
 		this._myMask.hide();
