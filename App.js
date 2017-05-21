@@ -227,7 +227,15 @@ Ext.define('CustomApp', {
 				sizeInFeature = sizeInFeature - feature.jobSize;
 				totalValue += feature.value;
 			}
-			series.data.push( totalValue );
+			
+			var lastFeatureName = 'N/A';
+			if ( featureIndex > features.length ) {
+				lastFeatureName = features[ featureIndex ].name;
+			}
+			series.data.push( {
+				y: totalValue,
+				tooltip: 'Value: ' + totalValue + '<br/>Feature: ' + lastFeatureName
+			} );
 			sizeInFeature++;
 		}
 		return series;
@@ -239,7 +247,7 @@ Ext.define('CustomApp', {
 				xtype: 'rallychart',
 				chartConfig: {
 					chart:{
-						type: 'area'
+						type: 'line'
 					},
 					legend: {
 						enabled: true
@@ -271,11 +279,11 @@ Ext.define('CustomApp', {
 					title:{
 						text: 'Projected Value over Time'
 					},
-//					tooltip: {
-//						useHTML: true,
-//						pointFormat: '{point.tooltip}',
-//						headerFormat: ''
-//					},
+					tooltip: {
+						useHTML: true,
+						pointFormat: '{point.tooltip}',
+						headerFormat: ''
+					},
 					plotOptions: {
 						series: {
 							dataLabels: {
