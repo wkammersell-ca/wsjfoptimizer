@@ -167,6 +167,7 @@ Ext.define('CustomApp', {
 				totalJobSize += predecessor.jobSize;
 			}, this);
 			
+			//feature.wsjfScore = Math.min( totalValue / totalJobSize, feature.value / feature.jobSize );
 			feature.wsjfScore = totalValue / totalJobSize;
 		}
 	},
@@ -189,6 +190,8 @@ Ext.define('CustomApp', {
 		sortedFeatures = sortedFeatures || [];
 		// Sort our list of features by the attribute
 		features.sort( function(a, b) { return a[attribute] < b[attribute]; } );
+		
+		console.log( features );
 		
 		// See if each feature is already in our sortedFeatures array
 		_.each( features, function( feature ) {
@@ -229,7 +232,7 @@ Ext.define('CustomApp', {
 			}
 			
 			var lastFeatureName = 'N/A';
-			if ( featureIndex > features.length ) {
+			if ( featureIndex < features.length ) {
 				lastFeatureName = features[ featureIndex ].name;
 			}
 			series.data.push( {
